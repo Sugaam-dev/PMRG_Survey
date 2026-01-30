@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<config>
+  <name>SurveyScoring</name>
+  <description>Survey scoring plugin</description>
+  <version>1.0</version>
+  <author>PMRG Solution</author>
+</config>

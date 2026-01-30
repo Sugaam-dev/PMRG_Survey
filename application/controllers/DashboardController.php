@@ -121,4 +121,90 @@ class DashboardController extends LSBaseController
 
         return $aData;
     }
+
+
+    /**
+ * Survey Analytics Dashboard
+ * URL:
+ * index.php/dashboard/surveyAnalytics/surveyid/548543
+ */
+public function actionSurveyAnalytics(int $surveyid): void
+{
+    $surveyid = (int)$surveyid;
+
+    // 1. Build response table name with prefix
+    $table = App()->db->tablePrefix . "survey_" . $surveyid;
+
+    // 2. Check response table exists
+    $exists = App()->db->createCommand(
+        "SHOW TABLES LIKE :t"
+    )->bindValue(':t', $table)->queryScalar();
+
+    if (!$exists) {
+        throw new CHttpException(
+            404,
+            "Survey response table not found: {$table}"
+        );
+    }
+
+    // 3. Total responses
+    $totalResponses = App()->db->createCommand(
+        "SELECT COUNT(*) FROM {$table}"
+    )->queryScalar();
+
+    // --------------------------------------------------
+    // FINALPRIMARYBUCKET01 → qid → response column
+    // --------------------------------------------------
+
+    // 4. Get question ID from question code
+    $qid = App()->db->createCommand(
+        "SELECT qid
+         FROM {{questions}}
+         WHERE title = :code AND sid = :sid"
+    )->bindValues([
+        ':code' => 'FINALPRIMARYBUCKET01',
+        ':sid'  => $surveyid
+    ])->queryScalar();
+
+    if (!$qid) {
+        throw new CHttpException(
+            500,
+            "Question code FINALPRIMARYBUCKET01 not found in survey {$surveyid}"
+        );
+    }
+
+    // 5. Build response column name (qidX)
+    $bucketColumn = $qid . 'X';
+
+    // 6. Verify column exists in response table
+    $columns = App()->db->schema->getTable($table)->columns;
+    if (!isset($columns[$bucketColumn])) {
+        throw new CHttpException(
+            500,
+            "Response column {$bucketColumn} not found in {$table}"
+        );
+    }
+
+    // 7. Query final bucket distribution
+    $finalBuckets = App()->db->createCommand(
+        "SELECT {$bucketColumn} AS label, COUNT(*) AS total
+         FROM {$table}
+         GROUP BY {$bucketColumn}"
+    )->queryAll();
+
+    // 8. Render dashboard view
+    $this->render(
+        'surveyAnalytics',
+        [
+            'surveyid'       => $surveyid,
+            'totalResponses' => $totalResponses,
+            'finalBuckets'   => $finalBuckets,
+            'bucketColumn'   => $bucketColumn
+        ]
+    );
+}
+
+
+
+
 }
